@@ -48,6 +48,7 @@ impl Size {
 
 struct Food;
 struct FoodSpawnTimer(Timer);
+struct GrowthEvent;
 
 impl Default for FoodSpawnTimer {
     fn default() -> Self {
@@ -76,6 +77,7 @@ impl Direction {
 
 fn main() {
     App::build()
+        .add_event::<GrowthEvent>()
         .add_resource(WindowDescriptor {
             title: "Snake!".to_string(),
             width: 2000,
@@ -91,6 +93,7 @@ fn main() {
         .add_startup_system(setup.system())
         .add_startup_stage("game_setup")
         .add_startup_system_to_stage("game_setup", spawn_snake.system())
+        .add_system(snake_eating.system())
         .add_system(snake_movement.system())
         .add_system(snake_timer.system())
         .add_system(position_translation.system())
@@ -201,6 +204,26 @@ fn snake_movement(
 
 fn snake_timer(time: Res<Time>, mut snake_timer: ResMut<SnakeMoveTimer>) {
     snake_timer.0.tick(time.delta_seconds);
+}
+
+fn snake_eating(
+    mut commands: Commands,
+    snake_timer: ResMut<SnakeMoveTimer>,
+    mut growth_events: ResMut<Events<GrowthEvent>>,
+    food_positions: Query<With<Food, (Entity, &Position)>>,
+    head_positions: Query<With<SnakeHead, &Position>>,
+) {
+    if !snake_timer.0.finished {
+        return;
+    }
+    for head_pos in head_positions.iter() {
+        for (ent, food_pos) in food_positions.iter() {
+            if food_pos == head_pos {
+                commands.despawn(ent);
+                growth_events.send(GrowthEvent);
+            }
+        }
+    }
 }
 
 fn size_scaling(windows: Res<Windows>, mut q: Query<(&Size, &mut Sprite)>) {
